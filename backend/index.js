@@ -16,13 +16,24 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Customizable system prompt
+const SYSTEM_PROMPT = "You are a helpful assistant specialized in gardening advice.";
+
 // POST /chat endpoint
 app.post("/chat", async (req, res) => {
   try {
-    const { messages } = req.body;
+    let { messages } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: "messages array required" });
+    }
+
+    // Prepend the system prompt only if not already present
+    if (!messages[0] || messages[0].role !== "system") {
+      messages = [
+        { role: "system", content: SYSTEM_PROMPT },
+        ...messages,
+      ];
     }
 
     const completion = await openai.chat.completions.create({
