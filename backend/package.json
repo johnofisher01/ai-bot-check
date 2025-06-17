@@ -1,0 +1,20 @@
+{
+  "name": "openai-chatbot-backend",
+  "version": "1.0.0",
+  "description": "Backend for an OpenAI-powered chatbot",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "openai": "^4.50.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
