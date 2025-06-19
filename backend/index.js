@@ -8,7 +8,6 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
@@ -17,35 +16,43 @@ const openai = new OpenAI({
 });
 
 // Customizable system prompt
-const SYSTEM_PROMPT = "You are a helpful assistant specialized in gardening advice.";
+const SYSTEM_PROMPT = "I want you to say at the begining of every response, FIRSTLY REMEMBER YOUR IN THE BEAVES RIGHT?AND SECONDLY then after that follow up to answer the question";
 
-// POST /chat endpoint
+// Streaming chat endpoint
 app.post("/chat", async (req, res) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+
+  let { messages } = req.body;
+  if (!messages || !Array.isArray(messages)) {
+    res.write(`data: ${JSON.stringify({ error: "messages array required" })}\n\n`);
+    res.end();
+    return;
+  }
+
+  if (!messages[0] || messages[0].role !== "system") {
+    messages = [{ role: "system", content: SYSTEM_PROMPT }, ...messages];
+  }
+
   try {
-    let { messages } = req.body;
-
-    if (!messages || !Array.isArray(messages)) {
-      return res.status(400).json({ error: "messages array required" });
-    }
-
-    // Prepend the system prompt only if not already present
-    if (!messages[0] || messages[0].role !== "system") {
-      messages = [
-        { role: "system", content: SYSTEM_PROMPT },
-        ...messages,
-      ];
-    }
-
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages,
+      stream: true,
     });
 
-    const reply = completion.choices?.[0]?.message?.content ?? "";
-    res.json({ reply, raw: completion });
+    for await (const chunk of completion) {
+      const token = chunk.choices?.[0]?.delta?.content;
+      if (token) {
+        res.write(`data: ${JSON.stringify({ token })}\n\n`);
+      }
+    }
+    res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+    res.end();
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "OpenAI API error", details: err.message });
+    res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
+    res.end();
   }
 });
 
