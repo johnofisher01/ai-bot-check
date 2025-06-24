@@ -2,7 +2,7 @@ import { Client } from "pg";
 
 // Set up the Postgres client with your connection info
 const dbClient = new Client({
-  host: "articles-dashboard.cr8eeq2k4s4r.eu-west-1.rds.amazonaws.com",
+  host: "articles-dashboard.cr8eeq2k4s4r.eu-west-2.rds.amazonaws.com",
   port: 5432,
   user: "postgres",
   password: "123PostGres!",
