@@ -19,7 +19,7 @@ const openai = new OpenAI({
 });
 
 // Customizable system prompt
-const SYSTEM_PROMPT = "Start every response with a quick knock knock joke";
+const SYSTEM_PROMPT = "just say helloooo at the bbginiogn eahc time ..... and barrys content is I AM A BIG SHARK if asked";
 
 // Streaming chat endpoint
 app.post("/chat", async (req, res) => {

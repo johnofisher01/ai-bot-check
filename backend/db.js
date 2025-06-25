@@ -1,15 +1,16 @@
 import { Client } from "pg";
 
-// Set up the Postgres client with your connection info
 const dbClient = new Client({
-  host: "articles-dashboard.cr8eeq2k4s4r.eu-west-2.rds.amazonaws.com",
-  port: 5432,
-  user: "postgres",
-  password: "123PostGres!",
-  database: "articles-dashboard",
+  host: process.env.PGHOST || "articles-dashboard.cr8eeq2k4s4r.eu-west-2.rds.amazonaws.com",
+  port: process.env.PGPORT || 5432,
+  user: process.env.PGUSER || "postgres",
+  password: process.env.PGPASSWORD || "123PostGres!",
+  database: process.env.PGDATABASE || "articles-dashboard",
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
-// Connect to the database
 export async function connectDb() {
   try {
     await dbClient.connect();
@@ -20,23 +21,46 @@ export async function connectDb() {
   }
 }
 
-// Search for an article related to the user's query
+/**
+ * Search articles by author (if author name present in the query) or by keyword (in title/content/summary).
+ * Returns up to 3 matching articles formatted as a string for prompt enrichment, or null if none found.
+ */
 export async function searchArticles(userQuery) {
-  // Simple keyword search in title or content
-  const sql = `
-    SELECT title, author, content
-    FROM articles
-    WHERE title ILIKE $1 OR content ILIKE $1
-    ORDER BY views DESC
-    LIMIT 1
-  `;
-  const values = [`%${userQuery}%`];
-  const result = await dbClient.query(sql, values);
-  if (result.rows.length > 0) {
-    const { title, author, content } = result.rows[0];
-    // Shorten content if too long for the prompt
-    const shortContent = content && content.length > 500 ? content.slice(0, 500) + "..." : content;
-    return `Article found:\nTitle: "${title}"\nAuthor: ${author}\nContent: ${shortContent}`;
+  if (!userQuery || typeof userQuery !== "string") return null;
+
+  let articles = [];
+  // Try to extract "by author" from the userQuery, e.g. "all data by Jane Holloway"
+  const authorMatch = userQuery.match(/by ([\w\s]+)/i);
+
+  if (authorMatch) {
+    const author = authorMatch[1].trim();
+    const res = await dbClient.query(
+      "SELECT id, title, author, content, views, shares, summary FROM articles WHERE author ILIKE $1 LIMIT 3",
+      [`%${author}%`]
+    );
+    articles = res.rows;
+  } else {
+    // Otherwise, search by keywords in title/content/summary
+    const res = await dbClient.query(
+      `SELECT id, title, author, content, views, shares, summary
+       FROM articles
+       WHERE title ILIKE $1 OR content ILIKE $1 OR summary ILIKE $1
+       LIMIT 3`,
+      [`%${userQuery}%`]
+    );
+    articles = res.rows;
+  }
+
+  if (articles.length > 0) {
+    // Format each article for the AI prompt
+    return articles.map(a =>
+      `Title: ${a.title}
+Author: ${a.author}
+Summary: ${a.summary}
+Content: ${a.content}
+Views: ${a.views}
+Shares: ${a.shares}`
+    ).join("\n---\n");
   }
   return null;
 }
